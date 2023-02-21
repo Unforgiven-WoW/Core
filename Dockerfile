@@ -29,8 +29,40 @@ RUN apt-get update \
 
 RUN git clone --branch ${GIT_BRANCH} --single-branch --depth 1 ${GIT_REPO} /src
 
+# Build the Core
 RUN mkdir -pv /build/ /artifacts/
 WORKDIR /build
 RUN cmake ../src -DTOOLS=1 -DWITH_WARNINGS=0 -DCMAKE_INSTALL_PREFIX=/opt/trinitycore -DCONF_DIR=/etc -Wno-dev
 RUN make -j$(nproc)
 RUN make install
+WORKDIR /artifacts
+
+# Copy built binaries and configuration files
+RUN tar -cf - \
+    /usr/share/ca-certificates \
+    /etc/ca-certificates* \
+    /bin/bash \
+    /usr/local/bin \
+    /usr/bin/mysql \
+    /usr/bin/curl \
+    /usr/bin/7zr \
+    /usr/bin/jq \
+    /usr/bin/git \
+    /usr/bin/xml2 \
+    /opt/trinitycore \
+    /etc/*server.conf.dist \
+  | tar -C /artifacts/ -xvf -
+
+# Finalize the environment
+FROM ubuntu:22.04
+
+LABEL author="Snuffish <snuffish90@gmail.com>"
+
+ENV LD_LIBRARY_PATH=/lib:/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu PATH=/bin:/usr/bin:/usr/local/bin:/opt/trinitycore/bin
+
+COPY --from=build /artifacts /
+
+RUN addgroup -g 1000 trinity \
+    && adduser -G trinity -D -u 1000 -h /opt/trinitycore trinity
+USER trinity
+WORKDIR /

@@ -1,0 +1,49 @@
+version: '3.4'
+
+volumes:
+    db-data:
+
+services:
+    mysql:
+        container_name: mysql
+        image: "mysql:latest"
+        environment:
+            MYSQL_ROOT_PASSWORD: trinity
+            MYSQL_USER: trinity
+            MYSQL_PASSWORD: trinity
+        ports:
+        - "3306:3306"
+        volumes:
+        - db-data:/var/lib/mysql
+        - ./sql/docker-entrypoint-initdb.d:/docker-entrypoint-initdb.d
+
+    authserver:
+        container_name: authserver
+        build: .
+        command: ["/bin/sh", "-c", "/artifacts/opt/trinitycore/bin/authserver -c /etc/authserver.conf"]
+        depends_on:
+        - mysql
+        - worldserver
+        ports:
+        - "3724:3724"
+        - "1119:1119"
+        volumes:
+        - ./authserver.conf:/etc/authserver.conf
+
+    worldserver:
+        container_name: worldserver
+        build: .
+        command: ["/bin/sh", "-c", "/artifacts/opt/trinitycore/bin/worldserver -c /etc/worldserver.conf"]
+        depends_on:
+        - mysql
+        ports:
+        - "8085:8085"
+        - "8086:8086"
+        - "8087:8087"
+        - "8088:8088"
+        - "8089:8089"
+        - "3443:3443"
+        - "7878:7878"
+        volumes:
+        - ./worldserver.conf:/etc/worldserver.conf
+        - ./sql/docker-entrypoint-initworld.d:/docker-entrypoint-initworld.d
