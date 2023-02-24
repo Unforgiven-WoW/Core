@@ -2,6 +2,7 @@ version: '3.4'
 
 volumes:
     db-data:
+    logs:
 
 services:
     mysql:
@@ -11,6 +12,7 @@ services:
             MYSQL_ROOT_PASSWORD: trinity
             MYSQL_USER: trinity
             MYSQL_PASSWORD: trinity
+        restart: always
         ports:
         - "3306:3306"
         volumes:
@@ -24,10 +26,12 @@ services:
         depends_on:
         - mysql
         - worldserver
+        restart: always
         ports:
         - "3724:3724"
         - "1119:1119"
         volumes:
+        - logs:/logs
         - ./authserver.conf:/etc/authserver.conf
 
     worldserver:
@@ -36,6 +40,7 @@ services:
         command: ["/bin/sh", "-c", "sleep 10 && worldserver"]
         depends_on:
         - mysql
+        restart: always
         ports:
         - "8085:8085"
         - "8086:8086"
@@ -45,6 +50,7 @@ services:
         - "3443:3443"
         - "7878:7878"
         volumes:
+        - logs:/logs
         - ./worldserver.conf:/etc/worldserver.conf
         - ./mapdata:/mapdata
         - ./sql/docker-entrypoint-initworld.d:/docker-entrypoint-initworld.d
