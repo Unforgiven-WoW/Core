@@ -19,8 +19,8 @@ services:
 
     authserver:
         container_name: authserver
-        build: .
-        command: ["/bin/sh", "-c", "/artifacts/opt/trinitycore/bin/authserver -c /etc/authserver.conf"]
+        image: "core_image:latest"
+        command: ["/bin/sh", "-c", "sleep 10 && authserver -c /etc/authserver.conf"]
         depends_on:
         - mysql
         - worldserver
@@ -32,8 +32,8 @@ services:
 
     worldserver:
         container_name: worldserver
-        build: .
-        command: ["/bin/sh", "-c", "/artifacts/opt/trinitycore/bin/worldserver -c /etc/worldserver.conf"]
+        image: "core_image:latest"
+        command: ["/bin/sh", "-c", "sleep 10 && worldserver -c /etc/worldserver.conf"]
         depends_on:
         - mysql
         ports:

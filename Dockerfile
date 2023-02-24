@@ -6,11 +6,13 @@ LABEL org.label-schema.name="snuffish/Unforgiven-WoW"
 
 ARG GIT_BRANCH=master
 ARG GIT_REPO=https://github.com/Unforgiven-WoW/Core.git
+ARG TDB_URL=https://github.com/TrinityCore/TrinityCore/releases/download/TDB335.23011/TDB_full_world_335.23011_2023_01_16.7z
 
 # Install necessary software's
 RUN apt-get update \
     && apt-get install -y \
         git \
+        wget \
         clang \
         cmake \
         make \
@@ -23,7 +25,7 @@ RUN apt-get update \
         libncurses-dev \
         libboost-all-dev \
         mysql-server \
-        p7zip \
+        p7zip-full \
     && update-alternatives --install /usr/bin/cc cc /usr/bin/clang 100 \
     && update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang 100
 
@@ -32,7 +34,7 @@ RUN git clone --branch ${GIT_BRANCH} --single-branch --depth 1 ${GIT_REPO} /src
 # Build the Core
 RUN mkdir -pv /build/ /artifacts/
 WORKDIR /build
-RUN cmake ../src -DTOOLS=1 -DWITH_WARNINGS=0 -DCMAKE_INSTALL_PREFIX=/opt/trinitycore -DCONF_DIR=/etc -Wno-dev
+RUN cmake ../src -DTOOLS=0 -DWITH_WARNINGS=0 -DCMAKE_INSTALL_PREFIX=/opt/trinitycore -DCONF_DIR=/etc -Wno-dev
 RUN make -j$(nproc)
 RUN make install
 WORKDIR /artifacts
@@ -53,16 +55,11 @@ RUN tar -cf - \
     /etc/*server.conf.dist \
   | tar -C /artifacts/ -xvf -
 
-# Finalize the environment
-FROM ubuntu:22.04
-
-LABEL author="Snuffish <snuffish90@gmail.com>"
-
 ENV LD_LIBRARY_PATH=/lib:/lib/x86_64-linux-gnu:/usr/lib/x86_64-linux-gnu PATH=/bin:/usr/bin:/usr/local/bin:/opt/trinitycore/bin
 
-COPY --from=build /artifacts /
+RUN wget ${TDB_URL} -O /tdb.7z \
+    && 7z x /tdb.7z -o/ \
+    && rm /tdb.7z
 
-RUN addgroup -g 1000 trinity \
-    && adduser -G trinity -D -u 1000 -h /opt/trinitycore trinity
-USER trinity
 WORKDIR /
+
