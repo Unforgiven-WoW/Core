@@ -54,7 +54,8 @@ RUN tar -cf - \
   | tar -C /artifacts/ -xvf -
 
 # Finalize the environment
-FROM ubuntu:22.04
+#FROM ubuntu:22.04
+FROM busybox
 
 LABEL author="Snuffish <snuffish90@gmail.com>"
 
