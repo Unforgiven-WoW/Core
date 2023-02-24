@@ -62,4 +62,3 @@ RUN wget ${TDB_URL} -O /tdb.7z \
     && rm /tdb.7z
 
 WORKDIR /
-
