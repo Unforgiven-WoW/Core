@@ -20,7 +20,7 @@ services:
     authserver:
         container_name: authserver
         image: "core_image:latest"
-        command: ["/bin/sh", "-c", "sleep 10 && authserver -c /etc/authserver.conf"]
+        command: ["/bin/sh", "-c", "sleep 10 && authserver"]
         depends_on:
         - mysql
         - worldserver
@@ -33,7 +33,7 @@ services:
     worldserver:
         container_name: worldserver
         image: "core_image:latest"
-        command: ["/bin/sh", "-c", "sleep 10 && worldserver -c /etc/worldserver.conf"]
+        command: ["/bin/sh", "-c", "sleep 10 && worldserver"]
         depends_on:
         - mysql
         ports:
@@ -46,4 +46,16 @@ services:
         - "7878:7878"
         volumes:
         - ./worldserver.conf:/etc/worldserver.conf
+        - ./mapdata:/mapdata
         - ./sql/docker-entrypoint-initworld.d:/docker-entrypoint-initworld.d
+
+    # nginx:
+    #     container_name: nginx
+    #     image: "core_nginx:latest"
+    #     ports:
+    #     - 80:80
+    #     - 8080:8080
+    #     depends_on:
+    #     - mysql
+    #     - authserver
+    #     - worldserver
