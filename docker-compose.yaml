@@ -55,13 +55,13 @@ services:
         - ./mapdata:/mapdata
         - ./sql/docker-entrypoint-initworld.d:/docker-entrypoint-initworld.d
 
-    # nginx:
-    #     container_name: nginx
-    #     image: "core_nginx:latest"
-    #     ports:
-    #     - 80:80
-    #     - 8080:8080
-    #     depends_on:
-    #     - mysql
-    #     - authserver
-    #     - worldserver
+    nginx:
+        container_name: nginx
+        image: "core_nginx:latest"
+        ports:
+        - 80:80
+        - 8080:8080
+        depends_on:
+        - mysql
+        - authserver
+        - worldserver
