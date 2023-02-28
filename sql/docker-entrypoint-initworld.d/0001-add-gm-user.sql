@@ -9,4 +9,3 @@ REPLACE INTO account (id, salt, verifier, username) VALUES (1, X'50f82985ee2bf8f
 -- Enable account GM access:
 REPLACE INTO account_access (AccountID, SecurityLevel) VALUES ((SELECT id FROM account WHERE username = 'TRINITY'), 3);
 --
-
