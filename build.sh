@@ -1,22 +1,23 @@
 #!/bin/bash
 
-BUILD_SERVICE=false
+declare -a BUILD_SERVICE=()
 read -p "Which you want to build? (1: AuthServer, 2: WorldServer, 3: Both): " OPTION
 case $OPTION in
     1)
-        BUILD_SERVICE="authserver";
+        BUILD_SERVICE=("authserver")
         ;;
     2)
-        BUILD_SERVICE="worldserver";
+        BUILD_SERVICE=("worldserver");
         ;;
     3)
-        BUILD_SERVICE="all";
+        BUILD_SERVICE=("authserver" "worldserver");
         ;;
     *)
         echo "Invalid option!";
         exit 0;
         ;;
 esac
+
 
 read -p "Do you want to build with --no-cache? (Y/N) " OPTION
 
@@ -26,6 +27,7 @@ if ([ "$OPTION" == "Y" ] || [ "$OPTION" == "y" ]); then NO_CACHE=true; fi
 
 docker build --no-cache=${NO_CACHE}  --build-arg BUILD_SERVICE=${BUILD_SERVICE} -t core-base .
 
-docker build -t core-authserver authserver
-
-docker build -t core-worldserver worldserver
+for SERVICE in "${BUILD_SERVICE[@]}"
+do
+    docker build -t "core-${SERVICE}" "${SERVICE}"
+done
