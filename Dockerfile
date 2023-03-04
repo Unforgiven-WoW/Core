@@ -54,6 +54,6 @@ RUN \
 
 FROM base
 
-COPY --from=build /opt/trinitycore/bin/authserver /authserver
+#COPY --from=build /opt/trinitycore/bin/authserver /authserver
 
 WORKDIR /
