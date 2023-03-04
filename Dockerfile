@@ -1,4 +1,4 @@
-FROM ubuntu:22.04 AS build
+FROM ubuntu:22.04
 
 LABEL author="Snuffish <snuffish90@gmail.com>"
 LABEL org.label-schema.schema-version="1.0"
@@ -29,12 +29,8 @@ RUN apt-get update \
     && update-alternatives --install /usr/bin/cc cc /usr/bin/clang 100 \
     && update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang 100
 
-# Build the Core
+# Copy source and set build/artifacts directories
 COPY . /src
 
 RUN mkdir -pv /build/ /artifacts/
 WORKDIR /build
-RUN cmake ../src -DTOOLS=0 -DWITH_WARNINGS=0 -DCMAKE_INSTALL_PREFIX=/opt/trinitycore -DCONF_DIR=/etc -Wno-dev
-RUN make -j$(nproc)
-RUN make install
-WORKDIR /artifacts
