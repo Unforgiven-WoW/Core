@@ -6,9 +6,10 @@ LABEL org.label-schema.name="snuffish/Unforgiven-WoW"
 
 ARG GIT_BRANCH=master
 ARG GIT_REPO=https://github.com/Unforgiven-WoW/Core.git
-ARG TDB_URL=https://github.com/TrinityCore/TrinityCore/releases/download/TDB335.23011/TDB_full_world_335.23011_2023_01_16.7z
+# ARG TDB_URL=https://github.com/TrinityCore/TrinityCore/releases/download/TDB335.23011/TDB_full_world_335.23011_2023_01_16.7z
 
 ARG BUILD_JOBS=4
+ARG BUILD_SERVICE
 
 # Install necessary software's
 RUN apt-get update \
@@ -48,7 +49,7 @@ RUN \
 
 # Finish the make build before next stage
 RUN \
-    make -j${BUILD_JOBS}
+    make -j${BUILD_JOBS} ${BUILD_SERVICE}
 
 
 # RUN \
