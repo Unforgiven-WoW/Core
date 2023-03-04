@@ -1,4 +1,4 @@
-FROM ubuntu:22.04
+FROM ubuntu:22.04 AS base
 
 LABEL author="Snuffish <snuffish90@gmail.com>"
 LABEL org.label-schema.schema-version="1.0"
@@ -32,6 +32,7 @@ RUN apt-get update \
     && update-alternatives --install /usr/bin/cc cc /usr/bin/clang 100 \
     && update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang 100
 
+FROM base AS build
 # Copy source and set build/artifacts directories
 COPY . /core
 
@@ -51,3 +52,9 @@ RUN \
 RUN \
     make -j${BUILD_JOBS} ${BUILD_SERVICE}
 
+
+FROM base
+
+COPY --from=build /opt/trinitycore/bin/* /
+
+WORKDIR /
