@@ -1,0 +1,52 @@
+version: '3.4'
+
+services:
+    mysql:
+        container_name: mysql
+        image: "mysql-database:latest"
+        environment:
+            MYSQL_ROOT_PASSWORD: root
+        restart: always
+        ports:
+        - "3306:3306"
+        volumes:
+        - mysql-data:/var/lib/mysql
+
+    authserver:
+        container_name: authserver
+        image: "core-authserver:latest"
+        command: ["/bin/sh", "-c", "sleep 10 && /opt/trinitycore/bin/authserver"]
+        depends_on:
+        - mysql
+        - worldserver
+        restart: always
+        ports:
+        - "3724:3724"
+        - "1119:1119"
+        volumes:
+        - logs:/logs
+        - ./authserver.conf:/etc/authserver.conf
+
+    worldserver:
+        container_name: worldserver
+        image: "core-worldserver:latest"
+        command: ["/bin/sh", "-c", "sleep 10 && /opt/trinitycore/bin/worldserver"]
+        depends_on:
+        - mysql
+        restart: always
+        ports:
+        - "8085:8085"
+        - "8086:8086"
+        - "8087:8087"
+        - "8088:8088"
+        - "8089:8089"
+        - "3443:3443"
+        - "7878:7878"
+        volumes:
+        - logs:/logs
+        - ./worldserver.conf:/etc/worldserver.conf
+        - ./mapdata:/mapdata
+
+volumes:
+    mysql-data:
+    logs:

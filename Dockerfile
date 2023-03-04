@@ -8,9 +8,6 @@ ARG GIT_BRANCH=master
 ARG GIT_REPO=https://github.com/Unforgiven-WoW/Core.git
 # ARG TDB_URL=https://github.com/TrinityCore/TrinityCore/releases/download/TDB335.23011/TDB_full_world_335.23011_2023_01_16.7z
 
-ARG BUILD_JOBS=4
-ARG BUILD_SERVICE
-
 # Install necessary software's
 RUN apt-get update \
     && apt-get install -y \
@@ -34,6 +31,8 @@ RUN apt-get update \
 
 FROM base AS build
 # Copy source and set build/artifacts directories
+ARG BUILD_SERVICE
+
 COPY . /core
 
 RUN mkdir -pv /build/ /artifacts/
@@ -52,8 +51,3 @@ RUN \
 RUN \
     make -j${BUILD_JOBS} ${BUILD_SERVICE}
 
-FROM base
-
-#COPY --from=build /opt/trinitycore/bin/authserver /authserver
-
-WORKDIR /
