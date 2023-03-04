@@ -25,3 +25,7 @@ NO_CACHE=false
 if ([ "$OPTION" == "Y" ] || [ "$OPTION" == "y" ]); then NO_CACHE=true; fi
 
 docker build --no-cache=${NO_CACHE}  --build-arg BUILD_SERVICE=${BUILD_SERVICE} -t core-base .
+
+docker build -t core-authserver authserver
+
+docker build -t core-worldserver worldserver
