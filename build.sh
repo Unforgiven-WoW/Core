@@ -12,6 +12,10 @@ case $OPTION in
     3)
         BUILD_SERVICE="all";
         ;;
+    *)
+        echo "Invalid option!";
+        exit 0;
+        ;;
 esac
 
 read -p "Do you want to build with --no-cache? (Y/N) " OPTION
