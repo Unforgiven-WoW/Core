@@ -47,7 +47,8 @@ RUN \
     -Who-dev
 
 # Finish the make build before next stage
-RUN make -j${BUILD_JOBS} worldserver
+RUN \
+    make -j${BUILD_JOBS} worldserver
 
 
 # RUN make install

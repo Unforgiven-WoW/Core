@@ -3,7 +3,7 @@ FROM core-base:latest AS base
 WORKDIR /build
 
 RUN \
-    make install authserver
+    make install worldserver
 
     # make -j$(nproc) authserver
 
