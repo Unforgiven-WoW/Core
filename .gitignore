@@ -26,3 +26,5 @@ cmake-build-*/
 .vs
 *.user
 mapdata/
+*.sql
+*.tar.gz

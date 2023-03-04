@@ -43,26 +43,10 @@ RUN \
     cmake ../core \
     -DTOOLS=0 \
     -DWITH_WARNINGS=0 \
-    -DCMAKE_INSTALL_PREFIX=/opt/trinitycore \
+    -DCMAKE_INSTALL_PREFIX=/bin \
     -DCONF_DIR=/etc \
     -Who-dev
 
 # Finish the make build before next stage
 RUN \
     make -j${BUILD_JOBS} ${BUILD_SERVICE}
-
-
-# RUN \
-#     make -j${BUILD_JOBS} worldserver
-
-
-# RUN make install
-
-# RUN \
-#     make -j${BUILD_JOBS} common
-
-# WORKDIR /
-# RUN cmake ../src -DTOOLS=0 -DWITH_WARNINGS=0 -DCMAKE_INSTALL_PREFIX=/opt/trinitycore -DCONF_DIR=/etc -Wno-dev
-# RUN make -j$(nproc)
-# RUN make install
-# WORKDIR /artifacts
