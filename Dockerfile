@@ -8,6 +8,8 @@ ARG GIT_BRANCH=master
 ARG GIT_REPO=https://github.com/Unforgiven-WoW/Core.git
 ARG TDB_URL=https://github.com/TrinityCore/TrinityCore/releases/download/TDB335.23011/TDB_full_world_335.23011_2023_01_16.7z
 
+ARG BUILD_JOBS=5000
+
 # Install necessary software's
 RUN apt-get update \
     && apt-get install -y \
@@ -30,19 +32,31 @@ RUN apt-get update \
     && update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang 100
 
 # Copy source and set build/artifacts directories
-COPY . /src
+COPY . /core
 
 RUN mkdir -pv /build/ /artifacts/
 WORKDIR /build
 
 # Build & compile the source
 RUN \
-    cmake ../src \
+    cmake ../core \
     -DTOOLS=0 \
     -DWITH_WARNINGS=0 \
-    -DCMAKE_INSTALL_PREFIX=/bin \
+    -DCMAKE_INSTALL_PREFIX=/opt/trinitycore \
     -DCONF_DIR=/etc \
     -Who-dev
 
-# RUN make -j$(nproc) && \
-#     make install
+# Finish the make build before next stage
+RUN make -j${BUILD_JOBS} authserver
+
+
+# RUN make install
+
+# RUN \
+#     make -j${BUILD_JOBS} common
+
+# WORKDIR /
+# RUN cmake ../src -DTOOLS=0 -DWITH_WARNINGS=0 -DCMAKE_INSTALL_PREFIX=/opt/trinitycore -DCONF_DIR=/etc -Wno-dev
+# RUN make -j$(nproc)
+# RUN make install
+# WORKDIR /artifacts
