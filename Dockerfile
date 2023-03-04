@@ -48,7 +48,11 @@ RUN \
 
 # Finish the make build before next stage
 RUN \
-    make -j${BUILD_JOBS} worldserver
+    make -j${BUILD_JOBS}
+
+
+# RUN \
+#     make -j${BUILD_JOBS} worldserver
 
 
 # RUN make install
