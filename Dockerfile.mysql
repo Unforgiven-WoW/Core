@@ -1,0 +1,8 @@
+FROM mysql:8.0.32
+
+ARG MYSQL_ROOT_PASSWORD=root
+ARG SQL_IMPORT=import.sql
+
+ENV MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+
+COPY ${SQL_IMPORT} /docker-entrypoint-initdb.d/
