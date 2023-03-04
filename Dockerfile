@@ -34,3 +34,15 @@ COPY . /src
 
 RUN mkdir -pv /build/ /artifacts/
 WORKDIR /build
+
+# Build & compile the source
+RUN \
+    cmake ../src \
+    -DTOOLS=0 \
+    -DWITH_WARNINGS=0 \
+    -DCMAKE_INSTALL_PREFIX=/bin \
+    -DCONF_DIR=/etc \
+    -Who-dev
+
+# RUN make -j$(nproc) && \
+#     make install
