@@ -3,7 +3,7 @@ version: '3.4'
 services:
     mysql:
         container_name: mysql
-        image: "unforgivenwow/mysql:1.0"
+        image: "unforgivenwow/mysql:latest"
         environment:
             MYSQL_ROOT_PASSWORD: root
         restart: always
@@ -14,7 +14,7 @@ services:
 
     authserver:
         container_name: authserver
-        image: "unforgivenwow/authserver:1.0"
+        image: "unforgivenwow/authserver:latest"
         command: ["/bin/sh", "-c", "sleep 10 && /opt/trinitycore/bin/authserver"]
         depends_on:
         - mysql
@@ -29,7 +29,7 @@ services:
 
     worldserver:
         container_name: worldserver
-        image: "unforgivenwow/worldserver:1.0"
+        image: "unforgivenwow/worldserver:latest"
         command: ["/bin/sh", "-c", "sleep 10 && /opt/trinitycore/bin/worldserver"]
         depends_on:
         - mysql
