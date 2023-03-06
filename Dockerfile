@@ -48,6 +48,6 @@ RUN \
     -Who-dev
 
 # Finish the make build before next stage
-RUN \
-    make -j${BUILD_JOBS} ${BUILD_SERVICE}
+#RUN \
+#    make -j${BUILD_JOBS}
 
