@@ -3,7 +3,7 @@ version: '3.4'
 services:
     mysql:
         container_name: mysql
-        image: "unforgivenwow/mysql:latest"
+        image: "mysql:8.0.32"
         environment:
             MYSQL_ROOT_PASSWORD: root
         restart: always
