@@ -1,4 +1,4 @@
-FROM core-base:latest AS base
+FROM core-builder:latest AS base
 
 WORKDIR /build
 
