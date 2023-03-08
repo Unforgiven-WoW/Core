@@ -14,7 +14,7 @@ services:
 
     authserver:
         container_name: authserver
-        image: "unforgivenwow/authserver:latest"
+        image: "unforgivenwow/core:latest"
         command: ["/bin/sh", "-c", "sleep 10 && /opt/trinitycore/bin/authserver"]
         depends_on:
         - mysql
@@ -29,7 +29,7 @@ services:
 
     worldserver:
         container_name: worldserver
-        image: "unforgivenwow/worldserver:latest"
+        image: "unforgivenwow/core:latest"
         command: ["/bin/sh", "-c", "sleep 10 && /opt/trinitycore/bin/worldserver"]
         depends_on:
         - mysql
