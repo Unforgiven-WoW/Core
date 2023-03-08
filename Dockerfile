@@ -29,10 +29,6 @@ RUN apt-get update \
     && update-alternatives --install /usr/bin/cc cc /usr/bin/clang 100 \
     && update-alternatives --install /usr/bin/c++ c++ /usr/bin/clang 100
 
-FROM base AS build
-# Copy source and set build/artifacts directories
-ARG BUILD_SERVICE
-
 COPY . /core
 
 RUN mkdir -pv /build/ /artifacts/
@@ -43,11 +39,12 @@ RUN \
     cmake ../core \
     -DTOOLS=0 \
     -DWITH_WARNINGS=0 \
-    -DCMAKE_INSTALL_PREFIX=/bin \
+    -DCMAKE_INSTALL_PREFIX=/opt/trinitycore \
     -DCONF_DIR=/etc \
     -Who-dev
 
 # Finish the make build before next stage
-#RUN \
-#    make -j${BUILD_JOBS}
+RUN make
+RUN make install
 
+WORKDIR /
