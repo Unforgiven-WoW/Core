@@ -60,6 +60,7 @@ export default function RegisterForm() {
             backgroundColor: 'white',
             padding: '25px'
         }}>
+            <h2 style={{ color: 'black' }}>Create Account</h2>
             <Grid item>
                 <TextField
                     id='username'
