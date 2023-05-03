@@ -1,4 +1,4 @@
-FROM unforgivenwow/core-builder:latest AS base
+FROM unforgivenwow/core-builder:1.0.0 AS base
 
 WORKDIR /build
 
