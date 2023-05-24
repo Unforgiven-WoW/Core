@@ -92,7 +92,6 @@
 #include "TicketMgr.h"
 #include "TradeData.h"
 #include "Trainer.h"
-#include "Transmogrification.h"
 #include "Transport.h"
 #include "UpdateData.h"
 #include "UpdateFieldFlags.h"
@@ -103,6 +102,9 @@
 #include "World.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
+#ifdef ELUNA
+#include "LuaEngine.h"
+#endif
 #include "WorldStatePackets.h"
 
 #define ZONE_UPDATE_INTERVAL (1*IN_MILLISECONDS)
@@ -716,7 +718,7 @@ void Player::SendMirrorTimer(MirrorTimerType Type, uint32 MaxValue, uint32 Curre
         return;
     }
 
-    SendDirectMessage(WorldPackets::Misc::StartMirrorTimer(Type, CurrentValue, MaxValue, Regen, 0, 0).Write());
+    SendDirectMessage(WorldPackets::Misc::StartMirrorTimer(Type, CurrentValue, MaxValue, Regen, false, 0).Write());
 }
 
 void Player::StopMirrorTimer(MirrorTimerType Type)
@@ -4242,9 +4244,6 @@ void Player::DeleteFromDB(ObjectGuid playerguid, uint32 accountId, bool updateRe
             stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_CHARACTER);
             stmt->setUInt32(0, guid);
             trans->Append(stmt);
-#ifdef PRESETS
-            trans->PAppend("DELETE FROM `custom_transmogrification_sets` WHERE `Owner` = %u", guid);
-#endif
 
             stmt = CharacterDatabase.GetPreparedStatement(CHAR_DEL_PLAYER_ACCOUNT_DATA);
             stmt->setUInt32(0, guid);
@@ -4606,6 +4605,9 @@ void Player::ResurrectPlayer(float restore_percent, bool applySickness)
     // recast lost by death auras of any items held in the inventory
     CastAllObtainSpells();
 
+#ifdef ELUNA
+    sEluna->OnResurrect(this);
+#endif
     if (!applySickness)
         return;
 
@@ -7628,8 +7630,10 @@ void Player::_ApplyWeaponDamage(uint8 slot, ItemTemplate const* proto, bool appl
             if (extraDPS)
             {
                 float average = extraDPS * proto->Delay / 1000.0f;
-                minDamage = 0.7f * average;
-                maxDamage = 1.3f * average;
+                float mod = ssv->isTwoHand(proto->ScalingStatValue) ? 0.2f : 0.3f;
+
+                minDamage = (1.0f - mod) * average;
+                maxDamage = (1.0f + mod) * average;
             }
         }
 
@@ -11787,6 +11791,12 @@ InventoryResult Player::CanUseItem(ItemTemplate const* proto) const
         if (HasSpell(proto->Spells[1].SpellId))
             return EQUIP_ERR_NONE;
 
+#ifdef ELUNA
+    InventoryResult eres = sEluna->OnCanUseItem(this, proto->ItemId);
+    if (eres != EQUIP_ERR_OK)
+        return eres;
+#endif
+
     return EQUIP_ERR_OK;
 }
 
@@ -12210,6 +12220,9 @@ Item* Player::EquipItem(uint16 pos, Item* pItem, bool update)
 
         ApplyEquipCooldown(pItem2);
 
+#ifdef ELUNA
+        sEluna->OnEquip(this, pItem2, bag, slot);
+#endif
         return pItem2;
     }
 
@@ -12220,6 +12233,9 @@ Item* Player::EquipItem(uint16 pos, Item* pItem, bool update)
     UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_EQUIP_ITEM, pItem->GetEntry());
     UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_EQUIP_EPIC_ITEM, slot, pItem->GetEntry());
 
+#ifdef ELUNA
+        sEluna->OnEquip(this, pItem, bag, slot);
+#endif
     return pItem;
 }
 
@@ -12244,6 +12260,10 @@ void Player::QuickEquipItem(uint16 pos, Item* pItem)
 
         UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_EQUIP_ITEM, pItem->GetEntry());
         UpdateAchievementCriteria(ACHIEVEMENT_CRITERIA_TYPE_EQUIP_EPIC_ITEM, slot, pItem->GetEntry());
+
+#ifdef ELUNA
+        sEluna->OnEquip(this, pItem, (pos >> 8), slot);
+#endif
     }
 }
 
@@ -12251,10 +12271,7 @@ void Player::SetVisibleItemSlot(uint8 slot, Item* pItem)
 {
     if (pItem)
     {
-        if (uint32 entry = pItem->transmog)
-            SetUInt32Value(PLAYER_VISIBLE_ITEM_1_ENTRYID + (slot * 2), entry);
-        else
-            SetUInt32Value(PLAYER_VISIBLE_ITEM_1_ENTRYID + (slot * 2), pItem->GetEntry());
+        SetUInt32Value(PLAYER_VISIBLE_ITEM_1_ENTRYID + (slot * 2), pItem->GetEntry());
         SetUInt16Value(PLAYER_VISIBLE_ITEM_1_ENCHANTMENT + (slot * 2), 0, pItem->GetEnchantmentId(PERM_ENCHANTMENT_SLOT));
         SetUInt16Value(PLAYER_VISIBLE_ITEM_1_ENCHANTMENT + (slot * 2), 1, pItem->GetEnchantmentId(TEMP_ENCHANTMENT_SLOT));
     }
@@ -12385,7 +12402,6 @@ void Player::MoveItemFromInventory(uint8 bag, uint8 slot, bool update)
     if (Item* it = GetItemByPos(bag, slot))
     {
         RemoveItem(bag, slot, update);
-        it->transmog = 0;
         ItemRemovedQuestCheck(it->GetEntry(), it->GetCount());
         it->SetNotRefundable(this, false);
         RemoveItemFromUpdateQueueOf(it, this);
@@ -14206,8 +14222,8 @@ void Player::PrepareGossipMenu(WorldObject* source, uint32 menuId /*= 0*/, bool 
                     break;
                 case GOSSIP_OPTION_VENDOR:
                 {
-                    VendorItemData const* vendorItems = itr->second.ActionMenuID ? nullptr : creature->GetVendorItems();
-                    if (!itr->second.ActionMenuID && (!vendorItems || vendorItems->Empty()))
+                    VendorItemData const* vendorItems = creature->GetVendorItems();
+                    if (!vendorItems || vendorItems->Empty())
                     {
                         TC_LOG_ERROR("sql.sql", "Creature %s (%s DB GUID: %u) has UNIT_NPC_FLAG_VENDOR set, but has an empty trading item list.", creature->GetName().c_str(), creature->GetGUID().ToString().c_str(), creature->GetSpawnId());
                         canTalk = false;
@@ -14426,7 +14442,7 @@ void Player::OnGossipSelect(WorldObject* source, uint32 gossipListId, uint32 men
             break;
         case GOSSIP_OPTION_VENDOR:
         case GOSSIP_OPTION_ARMORER:
-            GetSession()->SendListInventory(guid, menuItemData->GossipActionMenuId);
+            GetSession()->SendListInventory(guid);
             break;
         case GOSSIP_OPTION_STABLEPET:
             GetSession()->SendStablePet(guid);
@@ -14912,7 +14928,12 @@ void Player::AddQuestAndCheckCompletion(Quest const* quest, Object* questGiver)
     {
         case TYPEID_UNIT:
             PlayerTalkClass->ClearMenus();
+
+#ifdef ELUNA
+            sEluna->OnQuestAccept(this, questGiver->ToCreature(), quest);
+#endif
             questGiver->ToCreature()->AI()->OnQuestAccept(this, quest);
+
             break;
         case TYPEID_ITEM:
         case TYPEID_CONTAINER:
@@ -14944,7 +14965,12 @@ void Player::AddQuestAndCheckCompletion(Quest const* quest, Object* questGiver)
         }
         case TYPEID_GAMEOBJECT:
             PlayerTalkClass->ClearMenus();
+
+#ifdef ELUNA
+            sEluna->OnQuestAccept(this, questGiver->ToGameObject(), quest);
+#endif
             questGiver->ToGameObject()->AI()->OnQuestAccept(this, quest);
+
             break;
         default:
             break;
@@ -16065,6 +16091,9 @@ QuestGiverStatus Player::GetQuestDialogStatus(Object* questgiver)
     {
         case TYPEID_GAMEOBJECT:
         {
+#ifdef ELUNA
+            sEluna->GetDialogStatus(this, questgiver->ToGameObject());
+#endif
             if (auto ai = questgiver->ToGameObject()->AI())
                 if (auto questStatus = ai->GetDialogStatus(this))
                     return *questStatus;
@@ -16074,6 +16103,9 @@ QuestGiverStatus Player::GetQuestDialogStatus(Object* questgiver)
         }
         case TYPEID_UNIT:
         {
+#ifdef ELUNA
+            sEluna->GetDialogStatus(this, questgiver->ToCreature());
+#endif
             if (auto ai = questgiver->ToCreature()->AI())
                 if (auto questStatus = ai->GetDialogStatus(this))
                     return *questStatus;
@@ -21757,11 +21789,7 @@ bool Player::BuyItemFromVendorSlot(ObjectGuid vendorguid, uint32 vendorslot, uin
         return false;
     }
 
-    uint32 currentVendor = GetSession()->GetCurrentVendor();
-    if (currentVendor && vendorguid != PlayerTalkClass->GetGossipMenu().GetSenderGUID())
-        return false; // Cheating
-
-    VendorItemData const* vItems = currentVendor ? sObjectMgr->GetNpcVendorItemList(currentVendor) : creature->GetVendorItems();
+    VendorItemData const* vItems = creature->GetVendorItems();
     if (!vItems || vItems->Empty())
     {
         SendBuyError(BUY_ERR_CANT_FIND_ITEM, creature, item, 0);
@@ -22355,9 +22383,9 @@ bool Player::HaveAtClient(Object const* u) const
     return u == this || m_clientGUIDs.find(u->GetGUID()) != m_clientGUIDs.end();
 }
 
-bool Player::IsNeverVisible() const
+bool Player::IsNeverVisible(bool allowServersideObjects) const
 {
-    if (Unit::IsNeverVisible())
+    if (Unit::IsNeverVisible(allowServersideObjects))
         return true;
 
     if (GetSession()->PlayerLogout() || GetSession()->PlayerLoading())
@@ -22826,7 +22854,6 @@ void Player::SendInitialPacketsAfterAddToMap()
         SendDirectMessage(&setCompoundState);
     }
 
-    SendAurasForTarget(this);
     SendEnchantmentDurations();                             // must be after add to map
     SendItemDurations();                                    // must be after add to map
     SendQuestGiverStatusMultiple();
@@ -23220,9 +23247,9 @@ void Player::LearnSkillRewardedSpells(uint32 skillId, uint32 skillValue)
     }
 }
 
-void Player::SendAurasForTarget(Unit* target) const
+void Player::SendAurasForTarget(Unit* target, bool force /*= false*/) const
 {
-    if (!target || target->GetVisibleAuras().empty())                  // speedup things
+    if (!target || (!force && target->GetVisibleAuras().empty()))                  // speedup things
         return;
 
     WorldPacket data(SMSG_AURA_UPDATE_ALL);
@@ -23698,10 +23725,7 @@ void Player::AutoUnequipOffhandIfNeed(bool force /*= false*/)
     }
     else
     {
-        uint32 transmog = offItem->transmog;
         MoveItemFromInventory(INVENTORY_SLOT_BAG_0, EQUIPMENT_SLOT_OFFHAND, true);
-        offItem->transmog = transmog;
-
         CharacterDatabaseTransaction trans = CharacterDatabase.BeginTransaction();
         offItem->DeleteFromInventoryDB(trans);                   // deletes item from character's inventory
         offItem->SaveToDB(trans);                                // recursive and not have transaction guard into self, item not in inventory and can be save standalone
@@ -24934,6 +24958,9 @@ void Player::StoreLootItem(uint8 lootSlot, Loot* loot)
         if (loot->containerID > 0)
             sLootItemStorage->RemoveStoredLootItemForContainer(loot->containerID, item->itemid, item->count, item->itemIndex);
 
+#ifdef ELUNA
+        sEluna->OnLootItem(this, newitem, item->count, this->GetLootGUID());
+#endif
     }
     else
         SendEquipError(msg, nullptr, nullptr, item->itemid);
@@ -25349,6 +25376,10 @@ void Player::LearnTalent(uint32 talentId, uint32 talentRank)
 
     // update free talent points
     SetFreeTalentPoints(CurTalentPoints - (talentRank - curtalent_maxrank + 1));
+
+#ifdef ELUNA
+    sEluna->OnLearnTalents(this, talentId, talentRank, spellid);
+#endif
 }
 
 void Player::LearnPetTalent(ObjectGuid petGuid, uint32 talentId, uint32 talentRank)

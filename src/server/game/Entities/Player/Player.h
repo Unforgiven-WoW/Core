@@ -30,7 +30,6 @@
 #include "PetDefines.h"
 #include "PlayerTaxi.h"
 #include "QuestDef.h"
-#include "Transmogrification.h"
 #include <memory>
 #include <queue>
 #include <unordered_set>
@@ -151,16 +150,6 @@ struct SpellModifier
     uint32 spellId;
     Aura* const ownerAura;
 };
-
-#ifdef PRESETS
-typedef std::map<uint8, uint32> PresetslotMapType;
-struct PresetData
-{
-    std::string name;
-    PresetslotMapType slotMap; // slotMap[slotId] = entry
-};
-typedef std::map<uint8, PresetData> PresetMapType;
-#endif
 
 typedef std::unordered_map<uint32, PlayerTalent*> PlayerTalentMap;
 typedef std::unordered_map<uint32, PlayerSpell> PlayerSpellMap;
@@ -1906,7 +1895,7 @@ class TC_GAME_API Player : public Unit, public GridObject<Player>
         void SendBGWeekendWorldStates() const;
         void SendBattlefieldWorldStates() const;
 
-        void SendAurasForTarget(Unit* target) const;
+        void SendAurasForTarget(Unit* target, bool force = false) const;
 
         PlayerMenu* PlayerTalkClass;
         std::vector<ItemSetEffect*> ItemSetEff;
@@ -2037,7 +2026,7 @@ class TC_GAME_API Player : public Unit, public GridObject<Player>
 
         bool HaveAtClient(Object const* u) const;
 
-        bool IsNeverVisible() const override;
+        bool IsNeverVisible(bool allowServersideObjects) const override;
 
         bool IsVisibleGloballyFor(Player const* player) const;
 
@@ -2203,10 +2192,6 @@ class TC_GAME_API Player : public Unit, public GridObject<Player>
 
         std::string GetMapAreaAndZoneString() const;
         std::string GetCoordsMapAreaAndZoneString() const;
-
-#ifdef PRESETS
-        PresetMapType presetMap; // presetMap[presetId] = presetData
-#endif
 
         std::string GetDebugInfo() const override;
 

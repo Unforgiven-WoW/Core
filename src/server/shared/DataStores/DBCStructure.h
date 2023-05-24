@@ -896,6 +896,7 @@ struct ItemBagFamilyEntry
     //uint32 Name_lang_mask;                                // 17
 };
 
+/*
 struct ItemDisplayInfoEntry
 {
     uint32 ID;                                              // 0
@@ -911,6 +912,7 @@ struct ItemDisplayInfoEntry
     int32 ItemVisual;                                       // 23
     uint32 ParticleColorID;                                 // 24
 };
+*/
 
 /*
 struct ItemCondExtCostsEntry
@@ -1288,6 +1290,16 @@ struct ScalingStatValuesEntry
             if (mask & 0x00004000) return WandDPS;
         }
         return 0;
+    }
+
+    bool isTwoHand(uint32 mask) const
+    {
+        if (mask & 0x7E00)
+        {
+            if (mask & 0x00000400) return true;
+            if (mask & 0x00001000) return true;
+        }
+        return false;
     }
 
     uint32 getSpellBonus(uint32 mask) const

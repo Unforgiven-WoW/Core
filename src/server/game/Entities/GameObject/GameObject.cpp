@@ -41,6 +41,9 @@
 #include "Transport.h"
 #include "UpdateFieldFlags.h"
 #include "World.h"
+#ifdef ELUNA
+#include "LuaEngine.h"
+#endif
 #include <G3D/Box.h>
 #include <G3D/CoordinateFrame.h>
 #include <G3D/Quat.h>
@@ -225,6 +228,10 @@ void GameObject::AddToWorld()
 
         EnableCollision(toggledState);
         WorldObject::AddToWorld();
+
+#ifdef ELUNA
+        sEluna->OnAddToWorld(this);
+#endif
     }
 }
 
@@ -233,6 +240,9 @@ void GameObject::RemoveFromWorld()
     ///- Remove the gameobject from the accessor
     if (IsInWorld())
     {
+#ifdef ELUNA
+        sEluna->OnRemoveFromWorld(this);
+#endif
         if (m_zoneScript)
             m_zoneScript->OnGameObjectRemove(this);
 
@@ -374,6 +384,35 @@ bool GameObject::Create(ObjectGuid::LowType guidlow, uint32 name_id, Map* map, u
                 m_invisibility.AddFlag(INVISIBILITY_TRAP);
                 m_invisibility.AddValue(INVISIBILITY_TRAP, 300);
             }
+
+            m_goValue.Trap.TargetSearcherCheckType = TARGET_CHECK_ENEMY;
+            if (SpellInfo const* trapSpell = sSpellMgr->GetSpellInfo(goinfo->trap.spellId))
+            {
+                // positive spells may require enemy targets
+                if (trapSpell->IsPositive())
+                {
+                    bool targetsAlly = false;
+                    bool targetsEnemy = false;
+                    auto isAllyTarget = [](SpellImplicitTargetInfo const& targetInfo)
+                    {
+                        return targetInfo.GetObjectType() == TARGET_OBJECT_TYPE_UNIT && targetInfo.GetCheckType() == TARGET_CHECK_ALLY;
+                    };
+                    auto isEnemyTarget = [](SpellImplicitTargetInfo const& targetInfo)
+                    {
+                        return targetInfo.GetObjectType() == TARGET_OBJECT_TYPE_UNIT && targetInfo.GetCheckType() == TARGET_CHECK_ENEMY;
+                    };
+                    for (SpellEffectInfo const& spellEffectInfo : trapSpell->GetEffects())
+                    {
+                        if (!spellEffectInfo.IsEffect())
+                            continue;
+
+                        targetsAlly = targetsAlly || isAllyTarget(spellEffectInfo.TargetA) || isAllyTarget(spellEffectInfo.TargetB);
+                        targetsEnemy = targetsEnemy || isEnemyTarget(spellEffectInfo.TargetA) || isEnemyTarget(spellEffectInfo.TargetB);
+                    }
+                    if (targetsAlly)
+                        m_goValue.Trap.TargetSearcherCheckType = targetsEnemy ? TARGET_CHECK_DEFAULT : TARGET_CHECK_ALLY;
+                }
+            }
             break;
         default:
             SetGoAnimProgress(animprogress);
@@ -421,6 +460,9 @@ bool GameObject::Create(ObjectGuid::LowType guidlow, uint32 name_id, Map* map, u
 
 void GameObject::Update(uint32 diff)
 {
+#ifdef ELUNA
+    sEluna->UpdateAI(this, diff);
+#endif
     m_Events.Update(diff);
 
     if (AI())
@@ -651,10 +693,21 @@ void GameObject::Update(uint32 diff)
                     /// @todo this hack with search required until GO casting not implemented
                     if (GetOwner())
                     {
-                        // Hunter trap: Search units which are unfriendly to the trap's owner
-                        Trinity::NearestAttackableNoTotemUnitInObjectRangeCheck checker(this, radius);
-                        Trinity::UnitLastSearcher<Trinity::NearestAttackableNoTotemUnitInObjectRangeCheck> searcher(this, target, checker);
-                        Cell::VisitAllObjects(this, searcher, radius);
+                        // summoned traps: Search targets fit to trap spell data
+                        if (SpellInfo const* trapSpell = sSpellMgr->GetSpellInfo(goInfo->trap.spellId))
+                        {
+                            WorldObject* worldObjectTarget = nullptr;
+                            Trinity::WorldObjectSpellNearbyTargetCheck checker(radius, this, trapSpell, m_goValue.Trap.TargetSearcherCheckType, nullptr);
+                            Trinity::WorldObjectLastSearcher searcher(this, worldObjectTarget, checker, GRID_MAP_TYPE_MASK_CREATURE | GRID_MAP_TYPE_MASK_PLAYER);
+                            Cell::VisitAllObjects(this, searcher, radius);
+                            target = Object::ToUnit(worldObjectTarget);
+                        }
+                        else
+                        {
+                            Trinity::NearestAttackableNoTotemUnitInObjectRangeCheck checker(this, radius);
+                            Trinity::UnitLastSearcher<Trinity::NearestAttackableNoTotemUnitInObjectRangeCheck> searcher(this, target, checker);
+                            Cell::VisitAllObjects(this, searcher, radius);
+                        }
                     }
                     else
                     {
@@ -1240,12 +1293,12 @@ void GameObject::SaveRespawnTime(uint32 forceDelay)
     }
 }
 
-bool GameObject::IsNeverVisible() const
+bool GameObject::IsNeverVisible(bool allowServersideObjects) const
 {
-    if (WorldObject::IsNeverVisible())
+    if (WorldObject::IsNeverVisible(allowServersideObjects))
         return true;
 
-    if (GetGOInfo()->GetServerOnly())
+    if (GetGOInfo()->GetServerOnly() && !allowServersideObjects)
         return true;
 
     return false;
@@ -1578,6 +1631,11 @@ void GameObject::Use(Unit* user)
             playerUser->RemoveAurasByType(SPELL_AURA_MOUNTED);
 
         playerUser->PlayerTalkClass->ClearMenus();
+
+#ifdef ELUNA
+        if (sEluna->OnGossipHello(playerUser, this))
+            return;
+#endif
         if (AI()->OnGossipHello(playerUser))
             return;
     }
@@ -2366,6 +2424,9 @@ void GameObject::SetDestructibleState(GameObjectDestructibleState state, WorldOb
             break;
         case GO_DESTRUCTIBLE_DAMAGED:
         {
+#ifdef ELUNA
+            sEluna->OnDamaged(this, attackerOrHealer);
+#endif
             EventInform(m_goInfo->building.damagedEvent, attackerOrHealer);
             AI()->Damaged(attackerOrHealer, m_goInfo->building.damagedEvent);
 
@@ -2391,6 +2452,9 @@ void GameObject::SetDestructibleState(GameObjectDestructibleState state, WorldOb
         }
         case GO_DESTRUCTIBLE_DESTROYED:
         {
+#ifdef ELUNA
+            sEluna->OnDestroyed(this, attackerOrHealer);
+#endif
             EventInform(m_goInfo->building.destroyedEvent, attackerOrHealer);
             AI()->Destroyed(attackerOrHealer, m_goInfo->building.destroyedEvent);
 
@@ -2446,6 +2510,9 @@ void GameObject::SetLootState(LootState state, Unit* unit)
     else
         m_lootStateUnitGUID.Clear();
 
+#ifdef ELUNA
+    sEluna->OnLootStateChanged(this, state);
+#endif
     AI()->OnLootStateChanged(state, unit);
 
     // Start restock timer if the chest is partially looted or not looted at all
@@ -2474,6 +2541,9 @@ void GameObject::SetLootGenerationTime()
 void GameObject::SetGoState(GOState state)
 {
     SetByteValue(GAMEOBJECT_BYTES_1, 0, state);
+#ifdef ELUNA
+    sEluna->OnGameObjectStateChanged(this, state);
+#endif
     if (AI())
         AI()->OnStateChanged(state);
     if (m_model && !IsTransport())

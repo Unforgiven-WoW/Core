@@ -78,6 +78,10 @@
 #include "World.h"
 #include "WorldPacket.h"
 #include "WorldSession.h"
+#ifdef ELUNA
+#include "LuaEngine.h"
+#include "ElunaEventMgr.h"
+#endif
 #include <cmath>
 
 float baseMoveSpeed[MAX_MOVE_TYPE] =
@@ -429,6 +433,10 @@ Unit::~Unit()
 
 void Unit::Update(uint32 p_time)
 {
+#ifdef ELUNA
+    elunaEvents->Update(p_time);
+#endif
+
     // WARNING! Order of execution here is important, do not change.
     // Spells must be processed with event system BEFORE they go to _UpdateSpells.
     // Or else we may have some SPELL_STATE_FINISHED spells stalled in pointers, that is bad.
@@ -972,7 +980,7 @@ bool Unit::HasBreakableByDamageCrowdControlAura(Unit* excludeCasterChannel) cons
     }
 
     // make player victims stand up automatically
-    if (victim->GetStandState() && victim->IsPlayer())
+    if (victim->GetStandState() && victim->IsPlayer() && damagetype != NODAMAGE && damagetype != DOT)
         victim->SetStandState(UNIT_STAND_STATE_STAND);
 
     return damage;
@@ -3382,7 +3390,7 @@ void Unit::_ApplyAura(AuraApplication* aurApp, uint8 effMask)
         return;
 
     // Sitdown on apply aura req seated
-    if (aura->GetSpellInfo()->AuraInterruptFlags & AURA_INTERRUPT_FLAG_NOT_SEATED && !IsSitState())
+    if (aura->GetSpellInfo()->AuraInterruptFlags & AURA_INTERRUPT_FLAG_NOT_SEATED && GetStandState() == UNIT_STAND_STATE_STAND)
         SetStandState(UNIT_STAND_STATE_SIT);
 
     Unit* caster = aura->GetCaster();
@@ -10341,7 +10349,7 @@ void Unit::SetStandState(UnitStandStateType state)
 {
     SetByteValue(UNIT_FIELD_BYTES_1, UNIT_BYTES_1_OFFSET_STAND_STATE, state);
 
-    if (IsStandState())
+    if (state == UNIT_STAND_STATE_STAND)
        RemoveAurasWithInterruptFlags(AURA_INTERRUPT_FLAG_NOT_SEATED);
 
     if (GetTypeId() == TYPEID_PLAYER)

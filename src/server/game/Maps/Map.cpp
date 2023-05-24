@@ -44,6 +44,9 @@
 #include "Transport.h"
 #include "Vehicle.h"
 #include "VMapFactory.h"
+#ifdef ELUNA
+#include "LuaEngine.h"
+#endif
 #include "VMapManager2.h"
 #include "Weather.h"
 #include "WeatherMgr.h"
@@ -534,11 +537,11 @@ bool Map::EnsureGridLoaded(Cell const& cell)
     NGridType *grid = getNGrid(cell.GridX(), cell.GridY());
 
     ASSERT(grid != nullptr);
-    if (!isGridObjectDataLoaded(cell.GridX(), cell.GridY()))
+    if (!grid->isGridObjectDataLoaded())
     {
         TC_LOG_DEBUG("maps", "Loading grid[%u, %u] for map %u instance %u", cell.GridX(), cell.GridY(), GetId(), i_InstanceId);
 
-        setGridObjectDataLoaded(true, cell.GridX(), cell.GridY());
+        grid->setGridObjectDataLoaded(true);
 
         ObjectGridLoader loader(*grid, this, cell);
         loader.LoadN();
@@ -709,7 +712,8 @@ bool Map::AddToMap(Transport* obj)
 
 bool Map::IsGridLoaded(GridCoord const& p) const
 {
-    return (getNGrid(p.x_coord, p.y_coord) && isGridObjectDataLoaded(p.x_coord, p.y_coord));
+    NGridType* grid = getNGrid(p.x_coord, p.y_coord);
+    return grid && grid->isGridObjectDataLoaded();
 }
 
 void Map::VisitNearbyCellsOf(WorldObject* obj, TypeContainerVisitor<Trinity::ObjectUpdater, GridTypeMapContainer> &gridVisitor, TypeContainerVisitor<Trinity::ObjectUpdater, WorldTypeMapContainer> &worldVisitor)
@@ -2939,6 +2943,7 @@ void Map::SendInitSelf(Player* player)
 {
     TC_LOG_DEBUG("maps", "Creating player data for himself %s", player->GetGUID().ToString().c_str());
 
+    WorldPacket packet;
     UpdateData data;
 
     // attach to player data current transport data
@@ -2950,13 +2955,23 @@ void Map::SendInitSelf(Player* player)
     // build data for self presence in world at own client (one time for map)
     player->BuildCreateUpdateBlockForPlayer(&data, player);
 
+    // build and send self update packet before sending to player his own auras
+    data.BuildPacket(&packet);
+    player->SendDirectMessage(&packet);
+
+    // send to player his own auras (this is needed here for timely initialization of some fields on client)
+    player->SendAurasForTarget(player, true);
+
+    // clean buffers for further work
+    packet.clear();
+    data.Clear();
+
     // build other passengers at transport also (they always visible and marked as visible and will not send at visibility update at add to map
     if (Transport* transport = player->GetTransport())
         for (Transport::PassengerSet::const_iterator itr = transport->GetPassengers().begin(); itr != transport->GetPassengers().end(); ++itr)
             if (player != (*itr) && player->HaveAtClient(*itr))
                 (*itr)->BuildCreateUpdateBlockForPlayer(&data, player);
 
-    WorldPacket packet;
     data.BuildPacket(&packet);
     player->SendDirectMessage(&packet);
 }
@@ -3544,6 +3559,13 @@ void Map::AddObjectToRemoveList(WorldObject* obj)
 {
     ASSERT(obj->GetMapId() == GetId() && obj->GetInstanceId() == GetInstanceId());
 
+#ifdef ELUNA
+    if (Creature* creature = obj->ToCreature())
+        sEluna->OnRemove(creature);
+    else if (GameObject* gameobject = obj->ToGameObject())
+        sEluna->OnRemove(gameobject);
+#endif
+
     obj->CleanupsBeforeDelete(false);                            // remove or simplify at least cross referenced links
 
     i_objectsToRemove.insert(obj);
@@ -3980,15 +4002,34 @@ void InstanceMap::CreateInstanceData(bool load)
     if (i_data != nullptr)
         return;
 
-    InstanceTemplate const* mInstance = sObjectMgr->GetInstanceTemplate(GetId());
-    if (mInstance)
+    bool isElunaAI = false;
+
+#ifdef ELUNA
+    i_data = sEluna->GetInstanceData(this);
+    if (i_data)
+        isElunaAI = true;
+#endif
+
+    // if Eluna AI was fetched succesfully we should not call CreateInstanceData nor set the unused scriptID
+    if (!isElunaAI)
     {
-        i_script_id = mInstance->ScriptId;
-        i_data = sScriptMgr->CreateInstanceData(this);
+        InstanceTemplate const* mInstance = sObjectMgr->GetInstanceTemplate(GetId());
+        if (mInstance)
+        {
+            i_script_id = mInstance->ScriptId;
+            i_data = sScriptMgr->CreateInstanceData(this);
+        }
     }
 
     if (!i_data)
         return;
+
+    // use mangos behavior if we are dealing with Eluna AI
+    // initialize should then be called only if load is false
+#ifndef TRINITY
+    if (!isElunaAI || !load)
+        i_data->Initialize();
+#endif
 
     if (load)
     {
@@ -4005,7 +4046,7 @@ void InstanceMap::CreateInstanceData(bool load)
             i_data->SetCompletedEncountersMask(fields[1].GetUInt32());
             if (!data.empty())
             {
-                TC_LOG_DEBUG("maps", "Loading instance data for `%s` with id %u", sObjectMgr->GetScriptName(i_script_id).c_str(), i_InstanceId);
+                TC_LOG_DEBUG("maps", "Loading instance data for `%s` with id %u", isElunaAI ? "ElunaAI" : sObjectMgr->GetScriptName(i_script_id).c_str(), i_InstanceId);
                 i_data->Load(data.c_str());
             }
         }

@@ -42,6 +42,10 @@
 #include "StringConvert.h"
 #include "TemporarySummon.h"
 #include "Totem.h"
+#ifdef ELUNA
+#include "LuaEngine.h"
+#include "ElunaEventMgr.h"
+#endif
 #include "Transport.h"
 #include "Unit.h"
 #include "UpdateFieldFlags.h"
@@ -78,6 +82,11 @@ Object::Object() : m_PackGUID(sizeof(uint64)+1)
 
 WorldObject::~WorldObject()
 {
+#ifdef ELUNA
+    delete elunaEvents;
+    elunaEvents = NULL;
+#endif
+
     // this may happen because there are many !create/delete
     if (IsWorldObject() && m_currMap)
     {
@@ -966,6 +975,9 @@ void MovementInfo::OutDebug()
 }
 
 WorldObject::WorldObject(bool isWorldObject) : Object(), WorldLocation(), LastUsedScriptID(0),
+#ifdef ELUNA
+elunaEvents(NULL),
+#endif
 m_movementInfo(), m_name(), m_isActive(false), m_isFarVisible(false), m_isWorldObject(isWorldObject), m_zoneScript(nullptr),
 m_transport(nullptr), m_zoneId(0), m_areaId(0), m_staticFloorZ(VMAP_INVALID_HEIGHT), m_outdoors(false), m_liquidStatus(LIQUID_MAP_NO_WATER),
 m_currMap(nullptr), m_InstanceId(0), m_phaseMask(PHASEMASK_NORMAL), m_notifyflags(0)
@@ -1050,6 +1062,13 @@ void WorldObject::CleanupsBeforeDelete(bool /*finalCleanup*/)
 
     if (Transport* transport = GetTransport())
         transport->RemovePassenger(this);
+}
+
+void WorldObject::Update (uint32 time_diff)
+{
+#ifdef ELUNA
+    elunaEvents->Update(time_diff);
+#endif
 }
 
 void WorldObject::_Create(ObjectGuid::LowType guidlow, HighGuid guidhigh, uint32 phaseMask)
@@ -1543,12 +1562,12 @@ float WorldObject::GetSightRange(WorldObject const* target) const
     return 0.0f;
 }
 
-bool WorldObject::CanSeeOrDetect(WorldObject const* obj, bool ignoreStealth, bool distanceCheck, bool checkAlert) const
+bool WorldObject::CanSeeOrDetect(WorldObject const* obj, bool implicitDetect, bool distanceCheck, bool checkAlert) const
 {
     if (this == obj)
         return true;
 
-    if (obj->IsNeverVisible() || CanNeverSee(obj))
+    if (obj->IsNeverVisible(implicitDetect) || CanNeverSee(obj))
         return false;
 
     if (obj->IsAlwaysVisibleFor(this) || CanAlwaysSee(obj))
@@ -1630,7 +1649,7 @@ bool WorldObject::CanSeeOrDetect(WorldObject const* obj, bool ignoreStealth, boo
     if (obj->IsInvisibleDueToDespawn())
         return false;
 
-    if (!CanDetect(obj, ignoreStealth, checkAlert))
+    if (!CanDetect(obj, implicitDetect, checkAlert))
         return false;
 
     return true;
@@ -1641,7 +1660,7 @@ bool WorldObject::CanNeverSee(WorldObject const* obj) const
     return GetMap() != obj->GetMap() || !InSamePhase(obj);
 }
 
-bool WorldObject::CanDetect(WorldObject const* obj, bool ignoreStealth, bool checkAlert) const
+bool WorldObject::CanDetect(WorldObject const* obj, bool implicitDetect, bool checkAlert) const
 {
     WorldObject const* seer = this;
 
@@ -1661,10 +1680,10 @@ bool WorldObject::CanDetect(WorldObject const* obj, bool ignoreStealth, bool che
     if (obj->IsAlwaysDetectableFor(seer))
         return true;
 
-    if (!ignoreStealth && !seer->CanDetectInvisibilityOf(obj))
+    if (!implicitDetect && !seer->CanDetectInvisibilityOf(obj))
         return false;
 
-    if (!ignoreStealth && !seer->CanDetectStealthOf(obj, checkAlert))
+    if (!implicitDetect && !seer->CanDetectStealthOf(obj, checkAlert))
         return false;
 
     return true;
@@ -1829,6 +1848,12 @@ void WorldObject::SetMap(Map* map)
     m_currMap = map;
     m_mapId = map->GetId();
     m_InstanceId = map->GetInstanceId();
+
+#ifdef ELUNA
+    if (!elunaEvents)
+        elunaEvents = new ElunaEventProcessor(&Eluna::GEluna, this);
+#endif
+
     if (IsWorldObject())
         m_currMap->AddWorldObject(this);
 }
@@ -1839,6 +1864,7 @@ void WorldObject::ResetMap()
     ASSERT(!IsInWorld());
     if (IsWorldObject())
         m_currMap->RemoveWorldObject(this);
+
     m_currMap = nullptr;
     //maybe not for corpse
     //m_mapId = 0;

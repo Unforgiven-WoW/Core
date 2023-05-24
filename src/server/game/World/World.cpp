@@ -86,6 +86,9 @@
 #include "WardenCheckMgr.h"
 #include "WaypointManager.h"
 #include "WeatherMgr.h"
+#ifdef ELUNA
+#include "LuaEngine.h"
+#endif
 #include "WhoListStorage.h"
 #include "WorldSession.h"
 
@@ -1399,7 +1402,7 @@ void World::LoadConfigSettings(bool reload)
     m_bool_configs[CONFIG_ENABLE_MMAPS] = sConfigMgr->GetBoolDefault("mmap.enablePathFinding", true);
     TC_LOG_INFO("server.loading", "WORLD: MMap data directory is: %smmaps", m_dataPath.c_str());
 
-    m_bool_configs[CONFIG_VMAP_INDOOR_CHECK] = sConfigMgr->GetBoolDefault("vmap.enableIndoorCheck", 0);
+    m_bool_configs[CONFIG_VMAP_INDOOR_CHECK] = sConfigMgr->GetBoolDefault("vmap.enableIndoorCheck", false);
     bool enableIndoor = sConfigMgr->GetBoolDefault("vmap.enableIndoorCheck", true);
     bool enableLOS = sConfigMgr->GetBoolDefault("vmap.enableLOS", true);
     bool enableHeight = sConfigMgr->GetBoolDefault("vmap.enableHeight", true);
@@ -1593,6 +1596,12 @@ void World::SetInitialWorldSettings()
         TC_LOG_FATAL("server.loading", "Unable to load critical files - server shutting down !!!");
         exit(1);
     }
+
+#ifdef ELUNA
+    ///- Initialize Lua Engine
+    TC_LOG_INFO("server.loading", "Initialize Eluna Lua Engine...");
+    Eluna::Initialize();
+#endif
 
     ///- Initialize pool manager
     sPoolMgr->Initialize();
@@ -1885,7 +1894,7 @@ void World::SetInitialWorldSettings()
     TC_LOG_INFO("server.loading", "Loading SpellArea Data...");                // must be after quest load
     sSpellMgr->LoadSpellAreas();
 
-    TC_LOG_INFO("server.loading", "Loading AreaTrigger definitions...");
+    TC_LOG_INFO("server.loading", "Loading Area Trigger Teleports definitions...");
     sObjectMgr->LoadAreaTriggerTeleports();
 
     TC_LOG_INFO("server.loading", "Loading Access Requirements...");
@@ -2211,6 +2220,13 @@ void World::SetInitialWorldSettings()
 
     TC_LOG_INFO("server.loading", "Calculate guild limitation(s) reset time...");
     InitGuildResetTime();
+
+#ifdef ELUNA
+    ///- Run eluna scripts.
+    // in multithread foreach: run scripts
+    sEluna->RunScripts();
+    sEluna->OnConfigLoad(false); // Must be done after Eluna is initialized and scripts have run.
+#endif
 
     // Preload all cells, if required for the base maps
     if (sWorld->getBoolConfig(CONFIG_BASEMAP_LOAD_GRIDS))

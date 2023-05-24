@@ -54,6 +54,9 @@ class UpdateData;
 class WorldObject;
 class WorldPacket;
 class ZoneScript;
+#ifdef ELUNA
+class ElunaEventProcessor;
+#endif
 struct FactionTemplateEntry;
 struct PositionFullTerrainStatus;
 struct QuaternionData;
@@ -283,7 +286,7 @@ class TC_GAME_API WorldObject : public Object, public WorldLocation
     public:
         virtual ~WorldObject();
 
-        virtual void Update(uint32 /*time_diff*/) { }
+        virtual void Update(uint32 /*time_diff*/);
 
         void _Create(ObjectGuid::LowType guidlow, HighGuid guidhigh, uint32 phaseMask);
         void AddToWorld() override;
@@ -377,7 +380,7 @@ class TC_GAME_API WorldObject : public Object, public WorldLocation
         float GetGridActivationRange() const;
         float GetVisibilityRange() const;
         float GetSightRange(WorldObject const* target = nullptr) const;
-        bool CanSeeOrDetect(WorldObject const* obj, bool ignoreStealth = false, bool distanceCheck = false, bool checkAlert = false) const;
+        bool CanSeeOrDetect(WorldObject const* obj, bool implicitDetect = false, bool distanceCheck = false, bool checkAlert = false) const;
 
         FlaggedValuesArray32<int32, uint32, StealthType, TOTAL_STEALTH_TYPES> m_stealth;
         FlaggedValuesArray32<int32, uint32, StealthType, TOTAL_STEALTH_TYPES> m_stealthDetect;
@@ -496,6 +499,10 @@ class TC_GAME_API WorldObject : public Object, public WorldLocation
 
         uint32  LastUsedScriptID;
 
+#ifdef ELUNA
+        ElunaEventProcessor* elunaEvents;
+#endif
+
         // Transports
         Transport* GetTransport() const { return m_transport; }
         float GetTransOffsetX() const { return m_movementInfo.transport.pos.GetPositionX(); }
@@ -550,7 +557,7 @@ class TC_GAME_API WorldObject : public Object, public WorldLocation
         void SetLocationMapId(uint32 _mapId) { m_mapId = _mapId; }
         void SetLocationInstanceId(uint32 _instanceId) { m_InstanceId = _instanceId; }
 
-        virtual bool IsNeverVisible() const { return !IsInWorld(); }
+        virtual bool IsNeverVisible([[maybe_unused]] bool allowServersideObjects) const { return !IsInWorld(); }
         virtual bool IsAlwaysVisibleFor(WorldObject const* /*seer*/) const { return false; }
         virtual bool IsInvisibleDueToDespawn() const { return false; }
         //difference from IsAlwaysVisibleFor: 1. after distance check; 2. use owner or charmer as seer
